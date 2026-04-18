@@ -593,6 +593,7 @@ router.delete('/svg-shape/:shapeName', authenticate, requireRole('super_admin'),
 // ── GET /api/tokens/pending-items ── List all pending items
 router.get('/pending-items', authenticate, requireRole('super_admin', 'psychologist'), async (req, res) => {
   try {
+    console.log("penidnggggggggggggggggggggggggggggggggggggg")
     const { status = 'pending', domain } = req.query;
     let query = `SELECT * FROM pending_items WHERE 1=1`;
     const params = [];
