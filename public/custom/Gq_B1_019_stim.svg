@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="500" height="500" viewBox="0 0 500 500">
+  <rect width="500" height="500" fill="#FFFFFF"/>
+  <defs>
+    <linearGradient id="gg" x1="65" y1="65" x2="435" y2="435" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#BAE6FD"/>
+      <stop offset="40%" stop-color="#38BDF8"/>
+      <stop offset="100%" stop-color="#0C4A6E"/>
+    </linearGradient>
+    <linearGradient id="gshine" x1="120.5" y1="83.5" x2="379.5" y2="416.5" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="white" stop-opacity="0.28"/>
+      <stop offset="55%" stop-color="white" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="gsh" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="11" result="blur"/>
+      <feOffset in="blur" dx="0" dy="9" result="offset"/>
+      <feFlood flood-color="#0C4A6E" flood-opacity="0.30" result="flood"/>
+      <feComposite in="flood" in2="offset" operator="in" result="shadow"/>
+      <feMerge>
+        <feMergeNode in="shadow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <!-- Hollow right half -->
+  <path d="M 250,65 A 185,185 0 0,1 250,435 L 250,250 Z" fill="none" stroke="#38BDF8" stroke-width="2.5"/>
+  <!-- Shaded left half -->
+  <path d="M 250,65 A 185,185 0 0,0 250,435 L 250,250 Z" fill="url(#gg)" filter="url(#gsh)" stroke="#38BDF8" stroke-width="0.7"/>
+  <path d="M 250,65 A 185,185 0 0,0 250,435 L 250,250 Z" fill="url(#gshine)" stroke="none" pointer-events="none"/>
+  <!-- Dividing diameter -->
+  <line x1="250" y1="65" x2="250" y2="435" stroke="#38BDF8" stroke-width="2.2" stroke-linecap="round"/>
+</svg>

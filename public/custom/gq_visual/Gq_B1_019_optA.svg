@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="500" height="500" viewBox="0 0 500 500">
+  <rect width="500" height="500" fill="#FFFFFF"/>
+  <defs>
+    <linearGradient id="gg" x1="0" y1="0" x2="1" y2="1" gradientUnits="objectBoundingBox">
+      <stop offset="0%" stop-color="#93C5FD"/>
+      <stop offset="40%" stop-color="#1D4ED8"/>
+      <stop offset="100%" stop-color="#172554"/>
+    </linearGradient>
+    <linearGradient id="gshine" x1="0.15" y1="0.05" x2="0.85" y2="0.95" gradientUnits="objectBoundingBox">
+      <stop offset="0%" stop-color="white" stop-opacity="0.28"/>
+      <stop offset="55%" stop-color="white" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="gsh" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="11" result="blur"/>
+      <feOffset in="blur" dx="0" dy="9" result="offset"/>
+      <feFlood flood-color="#172554" flood-opacity="0.30" result="flood"/>
+      <feComposite in="flood" in2="offset" operator="in" result="shadow"/>
+      <feMerge>
+        <feMergeNode in="shadow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect x="70" y="110" width="360" height="280" rx="32" fill="url(#gg)" filter="url(#gsh)" stroke="#1D4ED8" stroke-width="0.7"/>
+  <rect x="70" y="110" width="360" height="280" rx="32" fill="url(#gshine)" stroke="none"/>
+  <text x="250" y="235" text-anchor="middle" dominant-baseline="auto"
+        font-family="Georgia, serif" font-size="90" font-weight="700" fill="#0f172a">1</text>
+  <line x1="195" y1="260" x2="305" y2="260" stroke="#0f172a" stroke-width="6" stroke-linecap="round"/>
+  <text x="250" y="320" text-anchor="middle" dominant-baseline="auto"
+        font-family="Georgia, serif" font-size="90" font-weight="700" fill="#0f172a">4</text>
+</svg>
