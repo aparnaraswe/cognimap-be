@@ -329,7 +329,6 @@ router.delete('/folders/:name', authenticate, requireRole('super_admin', 'psycho
 // ── GET /api/tokens/list-folder ── Browse existing images in a custom subfolder
 router.get('/list-folder', authenticate, requireRole('super_admin', 'psychologist'), (req, res) => {
   try {
-    console.log("inside riyteeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")
     const subfolder = (req.query.folder || '').trim().replace(/\\/g, '/');
     if (subfolder.includes('..')) return res.status(400).json({ error: 'Invalid folder' });
     const dir = path.join(CUSTOM_DIR, subfolder);
@@ -593,7 +592,6 @@ router.delete('/svg-shape/:shapeName', authenticate, requireRole('super_admin'),
 // ── GET /api/tokens/pending-items ── List all pending items
 router.get('/pending-items', authenticate, requireRole('super_admin', 'psychologist'), async (req, res) => {
   try {
-    console.log("penidnggggggggggggggggggggggggggggggggggggg")
     const { status = 'pending', domain } = req.query;
     let query = `SELECT * FROM pending_items WHERE 1=1`;
     const params = [];
