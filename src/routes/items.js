@@ -268,10 +268,12 @@ router.get('/practice', authenticate, async (req, res) => {
     if (!domain) return res.status(400).json({ error: 'domain query param required' });
     try {
         // First try dedicated practice items (is_practice = true)
+        // TEMP: force Gwm_B1_P03 for GWM practice testing — REVERT THIS
         let result = await pool.query(
             `SELECT id, item_code, domain, template, content, time_limit_sec, is_practice
              FROM items
-             WHERE domain = $1 AND is_practice = true AND is_active = true
+             WHERE domain = $1 AND is_active = true
+             ${domain === 'gwm' ? "AND item_code = 'Gwm_B1_P03'" : 'AND is_practice = true'}
              ORDER BY RANDOM()
              LIMIT 3`,
             [domain]
@@ -1153,10 +1155,19 @@ router.post('/upload', authenticate, requireRole('super_admin', 'psychologist'),
             // Stimulus row 1 — prefer explicit image-column ref; fall back to inline token
             // in the content cell; finally auto-generate (only if file exists on disk).
             // Never replace plain text sequences like "3 | 7" with a broken image ref.
+            // GWM pipe-delimited sequences (obj:pen | obj:cup) must NOT be overwritten
+            // by Stim1 Img Ref — the GWM shape-token resolver downstream handles them.
+            const stim1HasPipe = row.stimulusRow1 && String(row.stimulusRow1).includes('|');
+            const isGwmDomain = domainLower === 'gwm';
             const stim1Explicit = row.stim1Image && String(row.stim1Image).trim().startsWith('excel_img:');
             const stim1InlineToken = row.stimulusRow1 && String(row.stimulusRow1).trim().startsWith('excel_img:');
-            if (stim1Explicit) {
-                row.stimulusRow1 = resolveRef('stim1Image', 'stim');
+            if (isGwmDomain && stim1HasPipe && !stim1Explicit) {
+                // GWM text-only pipe-delimited sequence (e.g. "5 | 1 | 9") — keep it
+                console.log(`[GWM-PIPE-GUARD] ${row.itemId}: keeping text pipe-delimited stim "${row.stimulusRow1}"`);
+            } else if (stim1Explicit) {
+                const resolved = resolveRef('stim1Image', 'stim');
+                console.log(`[STIM1-RESOLVE] ${row.itemId}: Stim1 Img Ref → "${resolved}" (was: "${row.stimulusRow1}")`);
+                row.stimulusRow1 = resolved;
             } else if (stim1InlineToken) {
                 // Cell itself contains excel_img: — normalise folder and use as-is
                 row.stimulusRow1 = normaliseInlineToken(row.stimulusRow1);
@@ -1282,11 +1293,24 @@ router.post('/upload', authenticate, requireRole('super_admin', 'psychologist'),
                 const tokens = val.split('|').map(t => t.trim()).filter(Boolean);
                 const hasShapeToken = tokens.some(t => GWM_SHAPE_TOKEN.test(t));
                 if (hasShapeToken) {
-                    // Force to excel_img: so validation catches the missing file
-                    const suffix = GWM_FIELD_SUFFIX[field] || field;
-                    const forced = `excel_img:gwm_svg/${base}_${suffix}.png`;
-                    row[field] = forced;
-                    console.log(`[GWM-IMG-FORCE] ${row.itemId}.${field}: shape token "${val}" → "${forced}" (image required, not code-render)`);
+                    // Resolve EACH token individually — preserve pipe-delimited sequence
+                    const resolved = tokens.map(t => {
+                        if (t.startsWith('excel_img:') || t.startsWith('img_')) return t;
+                        if (GWM_IMAGE_EXT.test(t)) return `excel_img:gwm_svg/${t}`;
+                        if (t.startsWith('obj:')) {
+                            // obj:pen → excel_img:gwm_svg/obj_pen.svg
+                            const name = t.slice(4).toLowerCase().replace(/[^a-z0-9]/g, '_');
+                            return `excel_img:gwm_svg/obj_${name}.svg`;
+                        }
+                        if (GWM_SHAPE_TOKEN.test(t)) {
+                            // shape token like circle_md → excel_img:gwm_svg/obj_circle.svg
+                            const name = t.toLowerCase().replace(/_(?:xs|sm|md|lg|xl)$/, '');
+                            return `excel_img:gwm_svg/obj_${name}.svg`;
+                        }
+                        return t; // plain text token — keep as-is
+                    });
+                    row[field] = resolved.join(' | ');
+                    console.log(`[GWM-IMG-RESOLVE] ${row.itemId}.${field}: "${val}" → "${row[field]}"`);
                 }
             }
         }
@@ -1351,6 +1375,7 @@ router.post('/upload', authenticate, requireRole('super_admin', 'psychologist'),
         // ── Actually import ────────────────────────────────────────────────
         let inserted = 0, updated = 0, errors = 0, skipped = 0;
         const skippedItems = [];   // items stored as pending (unresolvable tokens)
+        const practiceByDomain = {};  // { gq: 3, gwm: 2, ... } — track practice items per domain
 
         // ── Load all known tokens from DB + sprite manifest ────────────────
         // This lets us accept any token that has already been registered,
@@ -1669,6 +1694,12 @@ router.post('/upload', authenticate, requireRole('super_admin', 'psychologist'),
                 if (result.rows[0].is_insert) inserted++;
                 else updated++;
 
+                // Track practice items per domain
+                if (isPractice) {
+                    const d = (row.domain || '').toLowerCase().trim();
+                    practiceByDomain[d] = (practiceByDomain[d] || 0) + 1;
+                }
+
                 // ── Link this item to all selected sources (multi-source) ──
                 const itemId = result.rows[0].id;
                 if (itemId && targetSourceIds.length > 0) {
@@ -1824,6 +1855,7 @@ router.post('/upload', authenticate, requireRole('super_admin', 'psychologist'),
         res.json({
             inserted, updated, errors, skipped,
             total: rows.length,
+            practiceByDomain,  // { gq: 3, gwm: 2 } — practice items per domain
             batteries: batteryInfo,
             items: itemsForValidation,
             skippedItems,   // items that need visual assets before they can be uploaded

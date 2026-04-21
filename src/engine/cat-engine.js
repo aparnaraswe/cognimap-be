@@ -552,6 +552,32 @@ function formatItemForClient(dbItem, domainState) {
     }
   }
 
+  // ── GWM image sequence fallback ────────────────────────────────
+  // If a GWM item has excel_img: tokens in stimulusRow1 but the
+  // sequence only has 1 entry, the student would only see 1 image
+  // before being asked "what was the third one?" — broken.
+  // Fix: for GWM items, if sequence has ≤1 excel_img token and the
+  // options contain excel_img tokens, build the sequence from the
+  // unique images across stimulus + options (the items to memorise).
+  if (dbItem.domain === 'gwm' && sequence.length <= 1) {
+    const hasImgStim = sequence.some(t => t && String(t).startsWith('excel_img:'));
+    const optImgs = (c.options || [])
+      .map(o => o.value)
+      .filter(v => v && String(v).startsWith('excel_img:'));
+    if (hasImgStim || optImgs.length > 0) {
+      // Combine: stimulus images + option images, deduplicated, preserving order
+      const allImgs = [...sequence.filter(t => t && String(t).startsWith('excel_img:')), ...optImgs];
+      const seen = new Set();
+      const deduped = [];
+      for (const img of allImgs) {
+        if (!seen.has(img)) { seen.add(img); deduped.push(img); }
+      }
+      if (deduped.length > sequence.length) {
+        sequence = deduped;
+      }
+    }
+  }
+
   // ── displayMode ───────────────────────────────────────────────
   // Priority:
   //   1. content.displayMode (saved from Excel "Display Mode" column)
