@@ -472,6 +472,76 @@ router.patch('/users/:id/toggle', authenticate, requireRole('super_admin', 'clie
     }
 });
 
+// ── POST /api/auth/users/:id/resend-credentials ── Regenerate password and email the user
+router.post('/users/:id/resend-credentials', authenticate, requireRole('super_admin', 'client_admin'), async (req, res) => {
+    try {
+        // ── Source scope: non-super-admin cannot touch users outside their source ──
+        if (req.user.role !== 'super_admin') {
+            const scopedSourceId = resolveSourceScope(req);
+            const tgt = await pool.query('SELECT source_id FROM users WHERE id = $1', [req.params.id]);
+            if (!tgt.rows.length) return res.status(404).json({ error: 'User not found' });
+            if (scopedSourceId && tgt.rows[0].source_id && tgt.rows[0].source_id !== scopedSourceId) {
+                return res.status(403).json({ error: 'Not authorized for this source' });
+            }
+        }
+
+        const userResult = await pool.query(
+            `SELECT id, email, first_name, last_name, role, parent_name, linked_student_id
+             FROM users WHERE id = $1`,
+            [req.params.id]
+        );
+        if (userResult.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+        const user = userResult.rows[0];
+        if (!user.email) return res.status(400).json({ error: 'User has no email on file' });
+
+        const newPassword = generatePassword(10);
+        const newHash = await bcrypt.hash(newPassword, 12);
+        await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHash, user.id]);
+
+        // ── Pick the appropriate template based on role ──
+        let sendResult;
+        if (user.role === 'parent') {
+            let studentName = '';
+            if (user.linked_student_id) {
+                const s = await pool.query(
+                    'SELECT first_name, last_name FROM users WHERE id = $1',
+                    [user.linked_student_id]
+                );
+                if (s.rows.length) {
+                    studentName = `${s.rows[0].first_name || ''} ${s.rows[0].last_name || ''}`.trim();
+                }
+            }
+            sendResult = await sendParentWelcome({
+                email: user.email,
+                parentName: user.parent_name || user.first_name,
+                studentName,
+                password: newPassword,
+            });
+        } else {
+            sendResult = await sendStudentWelcome({
+                email: user.email,
+                firstName: user.first_name,
+                lastName: user.last_name,
+                password: newPassword,
+            });
+        }
+
+        if (sendResult?.ok === false && !sendResult.skipped) {
+            return res.status(502).json({ error: 'Password reset but email failed', detail: sendResult.error });
+        }
+
+        res.json({
+            ok: true,
+            emailed: !!sendResult?.ok,
+            skipped: !!sendResult?.skipped,
+            to: user.email,
+        });
+    } catch (err) {
+        console.error('Resend credentials error:', err);
+        res.status(500).json({ error: 'Failed to resend credentials' });
+    }
+});
+
 // ── Helper: derive age band from DOB ──
 function deriveAgeBand(dob) {
     if (!dob) return null;
